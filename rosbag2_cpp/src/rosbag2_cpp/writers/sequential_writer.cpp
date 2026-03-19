@@ -480,16 +480,18 @@ void SequentialWriter::execute_bag_split_callbacks(
 
 void SequentialWriter::split_bagfile()
 {
-  split_bagfile_async();
+  if (!split_bagfile_async()) {
+    return;
+  }
   wait_for_pending_split();
 }
 
-void SequentialWriter::split_bagfile_async()
+bool SequentialWriter::split_bagfile_async()
 {
-  (void)start_split_bagfile_async(
+  return start_split_bagfile_async(
     [this]() {
       return split_bagfile_async_local();
-    });
+    }).valid();
 }
 
 void SequentialWriter::write(std::shared_ptr<const rosbag2_storage::SerializedBagMessage> message)
@@ -873,28 +875,26 @@ void SequentialWriter::wait_for_pending_split()
 std::shared_future<std::string> SequentialWriter::start_split_bagfile_async(
   const std::function<std::future<std::string>()> & split_launcher)
 {
-  std::shared_future<std::string> split_future;
+  std::lock_guard<std::mutex> lock(split_bagfile_mutex_);
+  // Lazy cleanup: clear a completed future so the slot becomes available for a new split
+  if (split_bagfile_shared_future_.valid() &&
+    split_bagfile_shared_future_.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
   {
-    std::lock_guard<std::mutex> lock(split_bagfile_mutex_);
-    if (!split_bagfile_shared_future_.valid()) {
-      if (!is_open_.load()) {
-        return {};
-      }
-      split_bagfile_shared_future_ = split_launcher().share();
-      return split_bagfile_shared_future_;
-    }
-    split_future = split_bagfile_shared_future_;
-  }
-  // TODO(morlov): Check if do really need this cleanup
-  try {
-    split_future.get();
-  } catch (...) {
-    clear_completed_split_future();
-    throw;
+    split_bagfile_shared_future_ = std::shared_future<std::string>{};
   }
 
-  clear_completed_split_future();
-  return split_future;
+  // The split is already in progress, return empty future to indicate that split was not started
+  if (split_bagfile_shared_future_.valid()) {
+    return {};
+  }
+
+  // Writer may have been closed while this request was pending.
+  if (!is_open_.load()) {
+    return {};
+  }
+
+  split_bagfile_shared_future_ = split_launcher().share();
+  return split_bagfile_shared_future_;
 }
 
 void SequentialWriter::clear_completed_split_future()

@@ -150,8 +150,9 @@ public:
 
   /**
    * \brief Starts closing the current backed storage and opening the next bagfile asynchronously.
+   * \returns true if split request was accepted, false if split is already in progress.
    */
-  void split_bagfile_async() override;
+  bool split_bagfile_async() override;
 
   /**
    * \brief Check if a callback is registered for the given event.
@@ -280,7 +281,8 @@ protected:
   /// Wait for a previously started asynchronous bag split to finish.
   void wait_for_pending_split();
 
-  /// Start a new asynchronous split after waiting for any previously started split to finish.
+  /// Start a new asynchronous split if there is no pending split.
+  /// \returns valid future if split request was accepted, invalid future if split is busy.
   std::shared_future<std::string> start_split_bagfile_async(
     const std::function<std::future<std::string>()> & split_launcher);
 

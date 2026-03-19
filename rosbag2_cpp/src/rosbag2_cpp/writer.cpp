@@ -107,10 +107,10 @@ void Writer::split_bagfile()
   writer_impl_->split_bagfile();
 }
 
-void Writer::split_bagfile_async()
+bool Writer::split_bagfile_async()
 {
   std::lock_guard<std::mutex> writer_lock(writer_mutex_);
-  writer_impl_->split_bagfile_async();
+  return writer_impl_->split_bagfile_async();
 }
 
 void Writer::write(std::shared_ptr<const rosbag2_storage::SerializedBagMessage> message)

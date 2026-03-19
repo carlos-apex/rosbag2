@@ -93,9 +93,10 @@ public:
     messages_per_file_ = 0;
   }
 
-  void split_bagfile_async() override
+  bool split_bagfile_async() override
   {
     split_bagfile();
+    return true;
   }
 
   void

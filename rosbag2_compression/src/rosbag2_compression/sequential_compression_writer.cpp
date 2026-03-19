@@ -413,9 +413,9 @@ void SequentialCompressionWriter::split_bagfile()
   }
 }
 
-void SequentialCompressionWriter::split_bagfile_async()
+bool SequentialCompressionWriter::split_bagfile_async()
 {
-  (void)start_split_bagfile_async(
+  return start_split_bagfile_async(
     [this]() {
       return std::async(std::launch::async, [this]()
              {
@@ -446,7 +446,7 @@ void SequentialCompressionWriter::split_bagfile_async()
                }
                return new_file;
              });
-    });
+    }).valid();
 }
 
 std::shared_ptr<rosbag2_storage::SerializedBagMessage>

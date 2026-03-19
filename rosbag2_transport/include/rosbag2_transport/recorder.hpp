@@ -205,8 +205,8 @@ public:
     const rcutils_time_point_value_t & recv_timestamp,
     uint32_t sequence_number = 0);
 
-  //// @brief Split the current bagfile and open a new one.
-  /// @return true if split was successful, false if recording is not active.
+  //// @brief Request splitting the current bagfile and opening a new one.
+  /// @return true if split request was accepted, false if recorder is not active or split is busy.
   /// \throws std::exception if underlying writer fails to split the bagfile.
   ROSBAG2_TRANSPORT_PUBLIC
   bool split_bagfile();

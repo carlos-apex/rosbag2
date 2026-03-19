@@ -134,7 +134,7 @@ public:
   /**
    * Start closing the current bag file and opening the next bag file asynchronously.
    */
-  void split_bagfile_async() override;
+  bool split_bagfile_async() override;
 
 protected:
   /**

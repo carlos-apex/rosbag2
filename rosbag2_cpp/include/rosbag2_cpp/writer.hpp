@@ -129,8 +129,9 @@ public:
 
   /**
    * Start closing the current bag file and opening the next bag file asynchronously.
+   * \returns true if split request was accepted, false if split is already in progress.
    */
-  void split_bagfile_async();
+  bool split_bagfile_async();
 
   /**
    * \brief Removes a new topic in the underlying storage.
