@@ -169,8 +169,15 @@ void MessageCache::log_dropped()
   }
 
   // TODO(morlov): Consider to not taking in to account producer_buffer_->size() when calling from
-  //  bag_split
-  size_t remaining = producer_buffer_->size() + consumer_buffer_->size();
+  //  bag_split, since producer buffer may already hold messages for the new file.
+  // Lock both buffers while reading sizes to avoid racing with swap_buffers().
+  // Keep lock order consistent with swap_buffers(): producer -> consumer.
+  size_t remaining = 0;
+  {
+    std::lock_guard<std::mutex> producer_lock(producer_buffer_mutex_);
+    std::lock_guard<std::mutex> consumer_lock(consumer_buffer_mutex_);
+    remaining = producer_buffer_->size() + consumer_buffer_->size();
+  }
   if (remaining > 0) {
     ROSBAG2_CPP_LOG_WARN_STREAM(
       "Cache buffers were unflushed with " << remaining << " remaining messages"
