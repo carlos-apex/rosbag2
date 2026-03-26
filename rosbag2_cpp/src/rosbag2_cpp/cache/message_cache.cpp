@@ -66,6 +66,7 @@ bool MessageCache::push(std::shared_ptr<const rosbag2_storage::SerializedBagMess
     // Notify the consumer that data is ready
     cache_condition_var_.notify_one();
   } else {
+    std::lock_guard<std::mutex> lock(dropped_messages_mutex_);
     messages_dropped_per_topic_[msg->topic_name]++;
   }
   return pushed;
@@ -141,15 +142,19 @@ void MessageCache::log_dropped()
   uint64_t total_lost = 0;
   std::string log_text("Cache buffers lost messages per topic: ");
 
-  // TODO(morlov): Protect messages_dropped_per_topic_ with mutex since we can call write(msg)
-  //  concurrently
+  std::unordered_map<std::string, uint32_t> messages_dropped_per_topic_snapshot;
+  {
+    std::lock_guard<std::mutex> lock(dropped_messages_mutex_);
+    messages_dropped_per_topic_snapshot = messages_dropped_per_topic_;
+  }
+
   // worse performance than sorting key vector (neglible), but cleaner
   std::map<std::string, uint32_t> messages_dropped_per_topic_sorted(
-    messages_dropped_per_topic_.begin(), messages_dropped_per_topic_.end());
+    messages_dropped_per_topic_snapshot.begin(), messages_dropped_per_topic_snapshot.end());
 
   std::for_each(
-    messages_dropped_per_topic_.begin(),
-    messages_dropped_per_topic_.end(),
+    messages_dropped_per_topic_sorted.begin(),
+    messages_dropped_per_topic_sorted.end(),
     [&total_lost, &log_text](const auto & e) {
       uint32_t lost = e.second;
       if (lost > 0) {

@@ -113,7 +113,10 @@ public:
   void notify_data_ready() override;
 
 protected:
-  /// Dropped messages per topic. Used for printing in alphabetic order
+  /// Protects dropped-messages accounting map against concurrent push()/log_dropped() access.
+  std::mutex dropped_messages_mutex_;
+
+  /// Dropped messages per topic. Used for printing in alphabetic order.
   std::unordered_map<std::string, uint32_t> messages_dropped_per_topic_;
 
 private:
