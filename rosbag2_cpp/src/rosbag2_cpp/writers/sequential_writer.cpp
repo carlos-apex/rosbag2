@@ -44,6 +44,12 @@ namespace writers
 
 namespace
 {
+struct SplitTopicSnapshot
+{
+  rosbag2_storage::TopicMetadata topic_metadata;
+  rosbag2_storage::MessageDefinition message_definition;
+};
+
 std::string strip_parent_path(const std::string & relative_path)
 {
   return fs::path(relative_path).filename().generic_string();
@@ -383,6 +389,15 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
     std::lock_guard<std::mutex> storage_lock(storage_mutex_);
     closed_file = storage_->get_relative_file_path();
   }
+  std::vector<SplitTopicSnapshot> topic_snapshots;
+  {
+    std::lock_guard<std::mutex> lock(topics_info_mutex_);
+    topic_snapshots.reserve(topics_names_to_info_.size());
+    for (const auto & topic : topics_names_to_info_) {
+      topic_snapshots.push_back(
+        {topic.second.topic_metadata, topic_names_to_message_definitions_[topic.first]});
+    }
+  }
   std::future<void> cache_flush_future_result;
 
   if (use_cache_) {  // Start flushing remaining messages from cache asynchronously.
@@ -393,6 +408,7 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
   std::future<std::string> split_future_result =
     std::async(std::launch::async,
       [this, closed_file, execute_callbacks,
+      topic_snapshots = std::move(topic_snapshots),
       cache_flush_future_result = std::move(cache_flush_future_result)]() mutable
       {
         if (use_cache_ && cache_flush_future_result.valid()) {
@@ -456,10 +472,10 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
           }
           {
             // Re-register all topics since we rolled-over to a new bagfile.
-            std::lock_guard<std::mutex> lock(topics_info_mutex_);
-            for (const auto & topic : topics_names_to_info_) {
-              auto const & md = topic_names_to_message_definitions_[topic.first];
-              storage_->create_topic(topic.second.topic_metadata, md);
+            for (const auto & topic_snapshot : topic_snapshots) {
+              storage_->create_topic(
+                topic_snapshot.topic_metadata,
+                topic_snapshot.message_definition);
             }
           }
           opened_file = storage_->get_relative_file_path();
