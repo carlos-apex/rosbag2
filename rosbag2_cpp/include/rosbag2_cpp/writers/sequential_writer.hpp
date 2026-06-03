@@ -181,6 +181,9 @@ protected:
   /// \brief Whether this writer/storage combination can defer old split metadata updates.
   virtual bool can_defer_old_metadata_update_on_split() const;
 
+  /// \brief Whether this writer/storage combination can skip new MCAP split metadata updates.
+  virtual bool can_skip_new_mcap_metadata_update_on_split() const;
+
   /// \brief Close the current bag file and rolls over to a new one.
   /// \details Splits the current bag file by closing the current storage and opening a new one
   /// with a new URI.

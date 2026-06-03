@@ -450,7 +450,9 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
             delete_oldest_files_if_needed();
 
             finalize_metadata();
-            storage_->update_metadata(metadata_);
+            if (!can_skip_new_mcap_metadata_update_on_split()) {
+              storage_->update_metadata(metadata_);
+            }
           }
           {
             // Re-register all topics since we rolled-over to a new bagfile.
@@ -734,6 +736,11 @@ bool SequentialWriter::message_within_accepted_time_range(
 bool SequentialWriter::can_defer_old_metadata_update_on_split() const
 {
   return true;
+}
+
+bool SequentialWriter::can_skip_new_mcap_metadata_update_on_split() const
+{
+  return storage_ && storage_->get_storage_identifier() == "mcap";
 }
 
 void SequentialWriter::finalize_metadata()

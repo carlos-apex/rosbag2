@@ -218,6 +218,11 @@ private:
   {
     return false;
   }
+
+  bool can_skip_new_mcap_metadata_update_on_split() const override
+  {
+    return false;
+  }
 };
 }  // namespace rosbag2_compression
 #endif  // ROSBAG2_COMPRESSION__SEQUENTIAL_COMPRESSION_WRITER_HPP_
