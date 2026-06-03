@@ -400,15 +400,20 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
         }
         std::string opened_file;
         std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> old_storage;
+        rosbag2_storage::BagMetadata old_metadata;
+        bool should_defer_old_metadata_update = false;
         {
           std::lock_guard<std::mutex> storage_lock(storage_mutex_);
           {
-            // TODO(morlov): Make copy of metadata before entering the async lambda and use it to
-            //  finalize current file, to avoid race condition which can lead to the global
-            //  metadata update from write message before we lock metadata_mutex_.
             std::lock_guard<std::mutex> metadata_lock(metadata_mutex_);
+            // Snapshot finalized old-file metadata after the cache flush and before adding the new
+            // file, so old storage finalization does not read mutable metadata_ later.
             finalize_metadata();
-            storage_->update_metadata(metadata_);
+            old_metadata = metadata_;
+            should_defer_old_metadata_update = can_defer_old_metadata_update_on_split();
+            if (!should_defer_old_metadata_update) {
+              storage_->update_metadata(metadata_);
+            }
 
             // Check for overflow: if next_file_index_ is 0, we've wrapped around (very unlikely
             // but possible)
@@ -461,6 +466,10 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
         if (use_cache_) {
           // restart consumer thread for cache
           cache_consumer_->start();
+        }
+
+        if (should_defer_old_metadata_update && old_storage) {
+          old_storage->update_metadata(old_metadata);
         }
 
         // Destroying the old storage can finalize the previous bag file. Keep it outside the cache
@@ -719,6 +728,11 @@ bool SequentialWriter::message_within_accepted_time_range(
     return false;
   }
 
+  return true;
+}
+
+bool SequentialWriter::can_defer_old_metadata_update_on_split() const
+{
   return true;
 }
 

@@ -213,6 +213,11 @@ private:
 
   // Prepares the metadata by setting initial values.
   void init_metadata() override;
+
+  bool can_defer_old_metadata_update_on_split() const override
+  {
+    return false;
+  }
 };
 }  // namespace rosbag2_compression
 #endif  // ROSBAG2_COMPRESSION__SEQUENTIAL_COMPRESSION_WRITER_HPP_
