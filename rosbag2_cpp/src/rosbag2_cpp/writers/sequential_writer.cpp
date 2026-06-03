@@ -399,6 +399,7 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
           cache_flush_future_result.get();  // Ensure cache is fully flushed before proceeding
         }
         std::string opened_file;
+        std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> old_storage;
         {
           std::lock_guard<std::mutex> storage_lock(storage_mutex_);
           {
@@ -421,12 +422,14 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
             storage_options_.uri = format_storage_uri(base_folder_, next_file_index_);
             next_file_index_++;
           }
-          storage_ = storage_factory_->open_read_write(storage_options_);
-          if (!storage_) {
+          auto new_storage = storage_factory_->open_read_write(storage_options_);
+          if (!new_storage) {
             std::stringstream errmsg;
             errmsg << "Failed to rollover bagfile to new file: \"" << storage_options_.uri << "\"!";
             throw std::runtime_error(errmsg.str());
           }
+          old_storage = std::move(storage_);
+          storage_ = std::move(new_storage);
           {
             std::lock_guard<std::mutex> metadata_lock(metadata_mutex_);
             rosbag2_storage::FileInformation file_info{};
@@ -459,6 +462,10 @@ std::future<std::string> SequentialWriter::split_bagfile_async_local(bool execut
           // restart consumer thread for cache
           cache_consumer_->start();
         }
+
+        // Destroying the old storage can finalize the previous bag file. Keep it outside the cache
+        // pause so writes buffered during the split can resume before that potentially slow close.
+        old_storage.reset();
 
         if (execute_callbacks) {
           execute_bag_split_callbacks(closed_file, opened_file);
